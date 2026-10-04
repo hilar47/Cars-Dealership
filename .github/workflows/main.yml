@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  lint_python:
+    name: Lint Python (flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install flake8
+        run: pip install flake8
+      - name: Run flake8
+        run: flake8 server --count --show-source --statistics
+
+  lint_js:
+    name: Lint JavaScript (jshint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Install jshint
+        run: npm install -g jshint
+      - name: Run jshint on the Express backend
+        run: jshint --config server/database/.jshintrc server/database/app.js server/database/review.js server/database/dealership.js
+
+  test_django:
+    name: Django checks and tests
+    runs-on: ubuntu-latest
+    needs: [lint_python]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r server/requirements.txt
+      - name: Django system check
+        run: python manage.py check
+        working-directory: server
+      - name: Check for missing migrations
+        run: python manage.py makemigrations --check --dry-run
+        working-directory: server
+      - name: Run Django tests
+        run: python manage.py test
+        working-directory: server
+
+  build_frontend:
+    name: Build React frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Install dependencies
+        run: npm install
+        working-directory: server/frontend
+      - name: Build
+        run: npm run build
+        working-directory: server/frontend
+
+  docker_build:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: [test_django, build_frontend]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build the Django + React image
+        run: docker build -t dealership:ci server

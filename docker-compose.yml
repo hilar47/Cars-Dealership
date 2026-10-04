@@ -1,0 +1,35 @@
+# Run the whole stack locally:  docker compose up --build
+# Django app:        http://localhost:8000
+# Express/Mongo API: http://localhost:3030
+# Sentiment service: http://localhost:5050
+services:
+  mongo_db:
+    image: mongo:7
+    restart: always
+
+  database:
+    build: ./server/database
+    environment:
+      MONGO_URL: mongodb://mongo_db:27017
+    ports:
+      - "3030:3030"
+    depends_on:
+      - mongo_db
+
+  sentiment:
+    build: ./server/djangoapp/microservices
+    ports:
+      - "5050:5050"
+
+  dealership:
+    build: ./server
+    environment:
+      backend_url: http://database:3030
+      sentiment_analyzer_url: http://sentiment:5050
+      DJANGO_ALLOWED_HOSTS: "*"
+      DJANGO_SECRET_KEY: change-me-for-real-deployments
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database
+      - sentiment

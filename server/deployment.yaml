@@ -1,0 +1,138 @@
+# Kubernetes manifests for the Cars Dealership stack.
+# Replace the image names (us.icr.io/YOUR_NAMESPACE/...) with the images you pushed to your registry.
+# Apply with:  kubectl apply -f server/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: mongo-db}
+  template:
+    metadata:
+      labels: {app: mongo-db}
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-db
+spec:
+  selector: {app: mongo-db}
+  ports:
+    - port: 27017
+      targetPort: 27017
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dealership-database
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: dealership-database}
+  template:
+    metadata:
+      labels: {app: dealership-database}
+    spec:
+      containers:
+        - name: database
+          image: us.icr.io/YOUR_NAMESPACE/dealership-database:latest
+          imagePullPolicy: Always
+          env:
+            - name: MONGO_URL
+              value: mongodb://mongo-db:27017
+          ports:
+            - containerPort: 3030
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dealership-database
+spec:
+  selector: {app: dealership-database}
+  ports:
+    - port: 3030
+      targetPort: 3030
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-analyzer
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: sentiment-analyzer}
+  template:
+    metadata:
+      labels: {app: sentiment-analyzer}
+    spec:
+      containers:
+        - name: sentiment
+          image: us.icr.io/YOUR_NAMESPACE/sentiment-analyzer:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5050
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment-analyzer
+spec:
+  selector: {app: sentiment-analyzer}
+  ports:
+    - port: 5050
+      targetPort: 5050
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dealership
+  labels:
+    run: dealership
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: dealership
+  template:
+    metadata:
+      labels:
+        run: dealership
+    spec:
+      containers:
+        - name: dealership
+          image: us.icr.io/YOUR_NAMESPACE/dealership:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: backend_url
+              value: http://dealership-database:3030
+            - name: sentiment_analyzer_url
+              value: http://sentiment-analyzer:5050
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "*"
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: dealership-secrets
+                  key: django-secret-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dealership
+spec:
+  type: NodePort
+  selector:
+    run: dealership
+  ports:
+    - port: 8000
+      targetPort: 8000

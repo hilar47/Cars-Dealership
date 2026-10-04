@@ -1,0 +1,14 @@
+services:
+  mongo_db:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    restart: always
+  api:
+    build: .
+    ports:
+      - "3030:3030"
+    environment:
+      MONGO_URL: mongodb://mongo_db:27017
+    depends_on:
+      - mongo_db

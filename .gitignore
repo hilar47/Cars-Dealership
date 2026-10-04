@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+server/db.sqlite3
+server/staticfiles/
+
+# Node
+node_modules/
+server/frontend/build/
+
+# Misc
+.env
+.DS_Store
+submission/cookies.txt
